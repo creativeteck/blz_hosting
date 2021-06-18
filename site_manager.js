@@ -1,48 +1,31 @@
-const config = require('config');
-const TextEncoder = require("util").TextEncoder;
-const TextDecoder = require("util").TextDecoder;
-const bluzelle = require('@bluzelle/sdk-js').bluzelle;
+const RepoService = require('./service/repo_service').RepoService;
 
-const defaultLease = {minutes: 0, seconds: 0, years: 0, hours: 1, days: 0};
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
+var myArgs = process.argv.slice(2);
+if (myArgs.length >= 3 && (myArgs[0] == "push" || myArgs[0] == "pull")) {
+    var method = myArgs[0];
+    var tag = myArgs[1];
+    var folder = myArgs[2];
+} else {
+    console.log("usage: node site_manager.js <push/pull> <site_name> <folder_name>");
+    console.log("When push is used, it will save the <site_name> in the <folder_name> to the Bluzelle database.");
+    console.log("When pull is used, it will load the <site_name> from Bluzelle database and store to the <folder_name>");
+    process.exit();
+}
+
 
 
 (async () => {
-const sdk = await bluzelle({
-        mnemonic: config.mnemonic, 
-        url: config.blz_url,
-        maxGas: 100000000, 
-        gasPrice:  0.002 		 
-});
+  var repo = new RepoService();
+  await repo.init();
+  if (method == "push") {
+    await repo.push(folder, tag);
+    console.log(tag + " site in " + folder + " folder has been stored at the Bluzelle database.");
+  }
 
-var uuid = Date.now().toString();
-var response = await sdk.db.tx.Create({
-            creator: sdk.db.address,
-            uuid,
-            key: 'myKey',
-            value: encoder.encode('myValue'),
-            metadata: new Uint8Array(),
-            lease: defaultLease
-        });
-console.log(response);
-response = await sdk.db.q.Read({uuid: uuid, key: 'myKey'});
-var output = decoder.decode(response.value);
-console.log(output);
-
-response = await sdk.db.tx.Update({
-            creator: sdk.db.address,
-            uuid,
-            key: 'myKey',
-            value: encoder.encode('secondValue'),
-            lease: defaultLease,
-            metadata: new Uint8Array()
-        });
-console.log("udpate:", response);
-response = await sdk.db.q.Read({uuid: uuid, key: 'myKey'});
-output = decoder.decode(response.value);
-console.log(output);
-
+  if (method == "pull") {
+    await repo.pull(tag, folder);
+    console.log(tag + " site has been read from the Bluzelle database. and store at folder " + folder);    
+  }
 
 })();
 
